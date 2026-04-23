@@ -120,6 +120,29 @@ node ".\scripts\gemini-web-mcp.mjs"
 
 For a Codex CLI registration example, see [examples/codex-mcp-setup.md](./examples/codex-mcp-setup.md).
 
+## Usage Example
+
+If you want to see the actual MCP call shape, not just client registration, see [examples/mcp-usage.md](./examples/mcp-usage.md).
+
+Minimal example:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "generate_image_ui",
+    "arguments": {
+      "prompt": "A polished open source repo banner for Gemini Web MCP, dark technical aesthetic, browser parity theme",
+      "transport": "auto",
+      "outputPath": "E:\\TEMPDOWNLOADS\\CodexImagine\\outputs\\banner.png",
+      "removeGeminiWatermark": true
+    }
+  }
+}
+```
+
 ## Compatibility
 
 | Client type | Status | Notes |
@@ -245,6 +268,7 @@ If you want the skill form, use [SKILL.md](./SKILL.md). If you only want the MCP
 - [Architecture Notes](./docs/architecture.md)
 - [Technical Deep Dive](./docs/technical.md)
 - [Client Setup Example](./examples/codex-mcp-setup.md)
+- [MCP Usage Example](./examples/mcp-usage.md)
 - [Optional Codex Skill](./SKILL.md)
 
 ## License
