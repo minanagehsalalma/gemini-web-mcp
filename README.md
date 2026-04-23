@@ -14,7 +14,7 @@ Direct `CycleTLS` first. Playwright fallback when the browser UI is actually req
 ![Auth](https://img.shields.io/badge/auth-manual%20sign--in-f59e0b)
 ![Runtime](https://img.shields.io/badge/node-%3E%3D20-22c55e)
 
-<img src="./assets/hero.png" alt="Gemini Web MCP hero" width="100%" />
+<img src="./assets/banner.png" alt="Gemini Web MCP banner" width="100%" />
 
 [Quickstart](#quickstart) •
 [Why It Wins](#why-it-wins) •
