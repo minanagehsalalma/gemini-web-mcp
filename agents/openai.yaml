@@ -1,6 +1,6 @@
 interface:
-  display_name: "Gemini Web Session"
-  short_description: "Safe Gemini web-session MCP bridge"
+  display_name: "Gemini Web MCP"
+  short_description: "Gemini web-session MCP bridge"
   default_prompt: "Use $gemini-web-session to query a manually signed-in Gemini browser session through MCP."
 dependencies:
   tools:

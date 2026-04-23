@@ -27,7 +27,6 @@ const playwrightModule = requireFirst([
   process.env.GEMINI_WEB_PLAYWRIGHT_MODULE,
   "playwright",
   "playwright-core",
-  "C:/Users/ASUS/.codex/vendor_imports/playwright-mcp/node_modules/playwright",
 ], "Playwright");
 const { chromium } = playwrightModule;
 
@@ -35,7 +34,6 @@ const cycleTlsModulePath = [
   process.env.GEMINI_WEB_CYCLETLS_JS_PATH,
   resolve(SCRIPT_DIR, "..", "vendor", "CycleTLS-Parity", "dist", "index.js"),
   "cycletls",
-  "C:/Users/ASUS/Downloads/Documents/Github/CycleTLS-Parity/dist/index.js",
 ].find((candidate) => candidate && (candidate === "cycletls" || existsSync(candidate)));
 const initCycleTLSModule = requireFirst([
   cycleTlsModulePath,
@@ -48,7 +46,6 @@ const WATERMARK_REMOVER_PATH = resolve(SCRIPT_DIR, "remove-gemini-watermark.js")
 const CYCLETLS_EXE_PATH = [
   process.env.GEMINI_WEB_CYCLETLS_EXE_PATH,
   resolve(SCRIPT_DIR, "..", "vendor", "CycleTLS-Parity", "dist", "index.exe"),
-  "C:/Users/ASUS/Downloads/Documents/Github/CycleTLS-Parity/dist/index.exe",
 ].find((candidate) => candidate && existsSync(candidate));
 const DIRECT_IMAGE_TEMPLATE_CACHE_PATH = resolve(SCRIPT_DIR, "cache", "direct-image-template.json");
 const DIRECT_REQUEST_HEADER_ORDER = [
@@ -1097,7 +1094,7 @@ async function inspectState() {
 function engineSource() {
   return String.raw`
 (() => {
-  if (window.__codexGeminiWeb) return true;
+  if (window.__geminiWebMcpBridge) return true;
   const TOKEN_TTL = 300000;
   let tokens = null;
   let tokensFetchedAt = 0;
@@ -1240,7 +1237,7 @@ function engineSource() {
     choiceId = "";
   }
 
-  window.__codexGeminiWeb = { ask, newConversation };
+  window.__geminiWebMcpBridge = { ask, newConversation };
   return true;
 })();`;
 }
@@ -1253,10 +1250,10 @@ async function ensureEngine(page) {
   const status = await statusForPage(page);
   if (status.needsLogin || status.hasNetworkError) return { ready: false, status };
   await page.evaluate(() => {
-    delete window.__codexGeminiWeb;
+    delete window.__geminiWebMcpBridge;
   }).catch(() => {});
   await page.evaluate(engineSource());
-  const ready = await page.evaluate(() => typeof window.__codexGeminiWeb !== "undefined");
+  const ready = await page.evaluate(() => typeof window.__geminiWebMcpBridge !== "undefined");
   return { ready, status: await statusForPage(page) };
 }
 
@@ -1265,7 +1262,7 @@ async function askGemini(args = {}) {
   return await withPage(async (page) => {
     const engine = await ensureEngine(page);
     if (!engine.ready) return { ok: false, blocker: "Gemini web engine is not ready. Sign in manually in the visible browser, then retry.", status: engine.status };
-    const response = await page.evaluate(async (message) => window.__codexGeminiWeb.ask(message), args.message);
+    const response = await page.evaluate(async (message) => window.__geminiWebMcpBridge.ask(message), args.message);
     return { ok: true, response };
   });
 }

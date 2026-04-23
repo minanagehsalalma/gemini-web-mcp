@@ -1,4 +1,4 @@
-# Codex MCP Setup
+# MCP Client Setup Example (Codex CLI)
 
 ```powershell
 $env:GEMINI_WEB_CDP_URL="http://127.0.0.1:9340"

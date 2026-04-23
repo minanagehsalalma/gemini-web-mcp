@@ -2,7 +2,7 @@
 
 ## Overview
 
-`CodexImagine` has two execution modes behind one MCP surface.
+`Gemini Web MCP` has two execution modes behind one MCP surface.
 
 ### Direct Path
 

@@ -1,36 +1,56 @@
-# CodexImagine
+# Gemini Web MCP
 
-CycleTLS-first Gemini web-session MCP for Codex.
+[![CI](https://github.com/minanagehsalalma/gemini-web-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/minanagehsalalma/gemini-web-mcp/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/minanagehsalalma/gemini-web-mcp)](./LICENSE)
 
-![CodexImagine hero](./assets/hero.png)
+Use a real Gemini web session from any MCP-compatible agent.
 
-`CodexImagine` turns a manually signed-in `gemini.google.com` browser session into a local MCP server for Codex. It prefers direct `CycleTLS` requests for simple text-to-image work, falls back to Playwright only when the direct path is not enough, and keeps the rest of the workflow practical: image-to-image uploads, batch generation, visible-image capture, and optional Gemini watermark cleanup.
+![Gemini Web MCP hero](./assets/hero.png)
+
+`gemini-web-mcp` is an unofficial MCP server that turns a manually signed-in `gemini.google.com` browser session into a reusable tool for any agent or MCP client. It prefers direct `CycleTLS` transport for fresh text-to-image requests, falls back to Playwright when the browser UI is actually needed, and keeps the rest of the workflow productized instead of brittle: image-to-image uploads, batch generation, visible-image capture, session-aware state inspection, and optional Gemini watermark cleanup.
 
 ## Why This Exists
 
-The official Gemini API image path is not useful if you do not want to enable billing. The Gemini web app is useful, but driving it entirely through DOM automation is slower and more fragile than it needs to be. This repo packages the bridge that came out of that tension:
+Gemini's web app is useful. The paid API path is not always the path people want. Pure DOM automation is also slower and more fragile than it needs to be.
 
-- Direct `CycleTLS` image requests first for fresh text-to-image jobs
-- Playwright fallback for UI-shaped flows like image-to-image and attachment-heavy prompts
+This repo bridges that gap:
+
+- Direct `CycleTLS` requests first for simple fresh generations
+- Playwright fallback for browser-only flows like image-to-image and attachment-heavy prompting
 - A dedicated signed-in Chrome profile instead of pasted cookies
-- MCP tools for state inspection, attachment control, visible-image saving, and watermark cleanup
-- A Codex skill surface, not just a raw script dump
+- A real MCP surface that can be used by any compatible client, not just one agent runtime
+- Operational tooling around the session: attachments, visible images, watermark cleanup, and diagnostics
 
-## What It Does
+## Positioning
 
-- Exposes a local stdio MCP server for Codex
-- Attaches to a dedicated Chrome profile over CDP
-- Uses Gemini's signed-in web session instead of the paid API path
-- Supports `text -> image`, `image -> image`, multi-image batches, and controlled parallel starts
-- Parses streamed direct responses incrementally and ranks returned image candidates
-- Can remove the Gemini sparkle watermark from saved PNGs on request
+- Category: unofficial Gemini web-session MCP bridge
+- Audience: anyone building or using MCP-compatible agents
+- Strength: direct-first transport with browser fallback, not browser automation only
+- Boundary: manual login required, no cookie import, no billing bypass claims
 
-## What It Does Not Do
+## What You Get
 
-- It does not import cookies or session tokens
-- It does not bypass Gemini billing or quota rules
-- It does not guarantee that Google will keep the same web endpoints or selectors
-- It does not make unofficial web automation “stable” in the API sense
+- `ask_gemini` for text/chat through the signed-in web session
+- `generate_image_ui` for direct-first image generation with UI fallback
+- image-to-image via real browser uploads
+- multi-image batches with concurrency and cooldown controls
+- state-aware tooling such as `check_status`, `inspect_state`, `list_attachments`, and `clear_attachments`
+- visible-image capture without re-generating outputs
+- optional Gemini watermark detection and cleanup for saved PNGs
+
+## Why It Feels Different
+
+Most unofficial Gemini browser bridges either:
+
+- stay trapped in fragile UI automation
+- act like a one-off wrapper for a single client
+- or skip the operational surfaces that matter once you use them repeatedly
+
+`gemini-web-mcp` is built around a cleaner split:
+
+- direct transport where it is actually reliable
+- browser automation only when the UI is the source of truth
+- one MCP surface usable from any compatible agent stack
 
 ## Quickstart
 
@@ -62,13 +82,28 @@ npm run launch:profile
 
 Sign in manually in the visible Chrome window and keep Gemini open.
 
-### 4. Register the MCP server in Codex
+### 4. Register the MCP server
+
+Any stdio-capable MCP client can run the same Node entrypoint:
 
 ```powershell
-codex mcp add gemini-web-session --env GEMINI_WEB_CDP_URL=http://127.0.0.1:9340 -- node ".\scripts\gemini-web-mcp.mjs"
+node ".\scripts\gemini-web-mcp.mjs"
 ```
 
-If the tool list does not refresh, restart Codex.
+For a Codex CLI example, see [examples/codex-mcp-setup.md](./examples/codex-mcp-setup.md).
+
+## Compatibility
+
+This repo is designed for MCP-compatible clients in general.
+
+Examples:
+
+- Codex CLI
+- Claude Desktop
+- custom MCP agent runtimes
+- other stdio-based MCP clients
+
+The core value is the MCP server, not a Codex-only wrapper.
 
 ## Main Tools
 
@@ -99,17 +134,19 @@ The direct path is best for fresh text-to-image prompts. The UI path still matte
 
 ```text
 assets/      hero image and repo visuals
-agents/      Codex/OpenAI skill metadata
+agents/      optional OpenAI/Codex skill metadata
 docs/        architecture and usage notes
-examples/    copy-paste config snippets
+examples/    client and registration examples
 references/  short source notes from the original exploration
 scripts/     MCP server, launcher, and watermark utilities
-SKILL.md     installable Codex skill instructions
+SKILL.md     optional Codex skill instructions
 ```
 
-## Installation As A Skill
+## Optional Codex Skill
 
-If you want this repo to be a real Codex skill, place or symlink the repo under your Codex skills directory with the folder name `gemini-web-session`, then register the MCP command from this repo.
+This repo includes a Codex skill because Codex is a useful MCP client, not because the project is Codex-only.
+
+If you want the skill form, use [SKILL.md](./SKILL.md). If you only want the MCP server, the repo already stands on its own.
 
 ## Safety Notes
 
@@ -117,12 +154,13 @@ If you want this repo to be a real Codex skill, place or symlink the repo under 
 - Treat this as an unofficial bridge, not a supported API
 - Keep sensitive local outputs out of the repo
 - Ask the user to handle login, CAPTCHA, quota, or consent screens manually
+- Do not add cookie-import flows
 
 ## Docs
 
 - [Architecture](./docs/architecture.md)
-- [MCP Registration Example](./examples/codex-mcp-setup.md)
-- [Skill Instructions](./SKILL.md)
+- [Client Setup Example](./examples/codex-mcp-setup.md)
+- [Optional Codex Skill](./SKILL.md)
 
 ## License
 

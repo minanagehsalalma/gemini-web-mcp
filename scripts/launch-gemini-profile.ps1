@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $Port = if ($env:GEMINI_WEB_CDP_PORT) { [int]$env:GEMINI_WEB_CDP_PORT } else { 9340 }
-$ProfileName = if ($env:GEMINI_WEB_PROFILE_NAME) { $env:GEMINI_WEB_PROFILE_NAME } else { "CodexGeminiWebProfile" }
+$ProfileName = if ($env:GEMINI_WEB_PROFILE_NAME) { $env:GEMINI_WEB_PROFILE_NAME } else { "GeminiWebMCPProfile" }
 
 $chromeCandidates = @(
   "C:\Program Files\Google\Chrome\Application\chrome.exe",

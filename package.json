@@ -1,10 +1,10 @@
 {
-  "name": "codeximagine",
+  "name": "gemini-web-mcp",
   "version": "0.1.0",
-  "description": "CycleTLS-first Gemini web-session MCP bridge for Codex with Playwright fallback, img2img support, and watermark cleanup utilities.",
+  "description": "Use a real Gemini web session from any MCP-compatible agent with direct CycleTLS transport first and Playwright fallback when needed.",
   "private": false,
   "bin": {
-    "codeximagine-mcp": "./scripts/gemini-web-mcp.mjs"
+    "gemini-web-mcp": "./scripts/gemini-web-mcp.mjs"
   },
   "scripts": {
     "mcp": "node ./scripts/gemini-web-mcp.mjs",
@@ -12,7 +12,7 @@
     "check": "node --check ./scripts/gemini-web-mcp.mjs"
   },
   "keywords": [
-    "codex",
+    "browser-automation",
     "mcp",
     "gemini",
     "playwright",
