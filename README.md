@@ -2,7 +2,7 @@
 
 # Gemini Web MCP
 
-**Use a real Gemini web session from any MCP-compatible agent.**
+**🍌 Use a real Gemini web session from any MCP-compatible agent.**
 
 Direct `CycleTLS` first. Playwright fallback when the browser UI is actually required.
 
