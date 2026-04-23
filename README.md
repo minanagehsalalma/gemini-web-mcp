@@ -122,26 +122,28 @@ For a Codex CLI registration example, see [examples/codex-mcp-setup.md](./exampl
 
 ## Usage Example
 
-If you want to see the actual MCP call shape, not just client registration, see [examples/mcp-usage.md](./examples/mcp-usage.md).
+Most people will use this through an agent, not by hand-writing JSON-RPC.
 
-Minimal example:
+Example user prompt:
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "tools/call",
-  "params": {
-    "name": "generate_image_ui",
-    "arguments": {
-      "prompt": "A polished open source repo banner for Gemini Web MCP, dark technical aesthetic, browser parity theme",
-      "transport": "auto",
-      "outputPath": "E:\\TEMPDOWNLOADS\\CodexImagine\\outputs\\banner.png",
-      "removeGeminiWatermark": true
-    }
-  }
-}
+```text
+Generate a polished banner for my repo called Gemini Web MCP.
+Use a dark technical aesthetic with subtle neon accents.
+Save it as E:\TEMPDOWNLOADS\CodexImagine\outputs\banner.png.
 ```
+
+Example agent output:
+
+```text
+Generated your banner and saved it to:
+E:\TEMPDOWNLOADS\CodexImagine\outputs\banner.png
+
+Transport used: direct
+Watermark cleanup: applied
+```
+
+For the full agent-style flow, see [examples/agent-usage.md](./examples/agent-usage.md).
+If you want the lower-level MCP JSON-RPC call shape, see [examples/mcp-usage.md](./examples/mcp-usage.md).
 
 ## Compatibility
 
@@ -268,6 +270,7 @@ If you want the skill form, use [SKILL.md](./SKILL.md). If you only want the MCP
 - [Architecture Notes](./docs/architecture.md)
 - [Technical Deep Dive](./docs/technical.md)
 - [Client Setup Example](./examples/codex-mcp-setup.md)
+- [Agent Usage Example](./examples/agent-usage.md)
 - [MCP Usage Example](./examples/mcp-usage.md)
 - [Optional Codex Skill](./SKILL.md)
 
