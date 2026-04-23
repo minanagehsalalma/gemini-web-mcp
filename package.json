@@ -1,0 +1,32 @@
+{
+  "name": "codeximagine",
+  "version": "0.1.0",
+  "description": "CycleTLS-first Gemini web-session MCP bridge for Codex with Playwright fallback, img2img support, and watermark cleanup utilities.",
+  "private": false,
+  "bin": {
+    "codeximagine-mcp": "./scripts/gemini-web-mcp.mjs"
+  },
+  "scripts": {
+    "mcp": "node ./scripts/gemini-web-mcp.mjs",
+    "launch:profile": "powershell -ExecutionPolicy Bypass -File ./scripts/launch-gemini-profile.ps1",
+    "check": "node --check ./scripts/gemini-web-mcp.mjs"
+  },
+  "keywords": [
+    "codex",
+    "mcp",
+    "gemini",
+    "playwright",
+    "cycletls",
+    "image-generation",
+    "img2img"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "cycletls": "^2.0.5",
+    "playwright": "^1.59.1",
+    "pngjs": "^7.0.0"
+  }
+}

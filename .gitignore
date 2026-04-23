@@ -1,0 +1,22 @@
+node_modules/
+scripts/node_modules/
+scripts/cache/
+vendor/
+.DS_Store
+Thumbs.db
+*.log
+perplexity.log
+
+# Local output artifacts from iterative Gemini tests
+gemini-web-*.png
+gemini-web-*.jpg
+gemini-web-*.jpeg
+
+# Keep repo assets, docs, and examples
+!assets/
+!assets/**
+!docs/
+!docs/**
+!examples/
+!examples/**
+

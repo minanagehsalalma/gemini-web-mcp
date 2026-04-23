@@ -1,0 +1,12 @@
+interface:
+  display_name: "Gemini Web Session"
+  short_description: "Safe Gemini web-session MCP bridge"
+  default_prompt: "Use $gemini-web-session to query a manually signed-in Gemini browser session through MCP."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "gemini-web-session"
+      description: "Local stdio MCP server attaching to a manually signed-in Gemini Chrome profile over CDP."
+      transport: "stdio"
+policy:
+  allow_implicit_invocation: true
