@@ -238,6 +238,7 @@ If you want the skill form, use [SKILL.md](./SKILL.md). If you only want the MCP
 ## Docs
 
 - [Architecture Notes](./docs/architecture.md)
+- [Technical Deep Dive](./docs/technical.md)
 - [Client Setup Example](./examples/codex-mcp-setup.md)
 - [Optional Codex Skill](./SKILL.md)
 
