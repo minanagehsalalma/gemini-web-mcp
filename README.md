@@ -6,6 +6,8 @@
 
 Direct `CycleTLS` first. Playwright fallback when the browser UI is actually required.
 
+`CycleTLS` is used because plain HTTP clients often do not look enough like a real browser session for Gemini web request and asset flows to behave reliably.
+
 [![CI](https://github.com/minanagehsalalma/gemini-web-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/minanagehsalalma/gemini-web-mcp/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/minanagehsalalma/gemini-web-mcp)](./LICENSE)
 ![Protocol](https://img.shields.io/badge/protocol-MCP-0f172a)
