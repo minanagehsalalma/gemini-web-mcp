@@ -28,7 +28,7 @@ Direct `CycleTLS` first. Playwright fallback when the browser UI is actually req
 
 `gemini-web-mcp` is an unofficial MCP server that turns a manually signed-in `gemini.google.com` browser session into a reusable tool for any agent or MCP client.
 
-It can also be used as a Nano Banana-style MCP for Gemini image generation and image-to-image workflows when you want that surface exposed through a general MCP bridge instead of a client-specific wrapper.
+🍌 It can also be used as a Nano Banana-style MCP for Gemini image generation and image-to-image workflows when you want that surface exposed through a general MCP bridge instead of a client-specific wrapper.
 
 It is not a thin browser script and it is not a Codex-only wrapper.
 
