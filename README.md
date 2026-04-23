@@ -86,7 +86,7 @@ The repo is built around a sharper split:
 npm install
 ```
 
-### 2. Point the repo at CycleTLS-Parity
+### 2. Point the repo at [CycleTLS-Parity](https://github.com/minanagehsalalma/CycleTLS-Parity)
 
 ```powershell
 $env:GEMINI_WEB_CYCLETLS_JS_PATH="E:\path\to\CycleTLS-Parity\dist\index.js"
