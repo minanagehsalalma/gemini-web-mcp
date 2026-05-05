@@ -6,6 +6,12 @@ import { dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { access, mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 
+const stderrConsole = new console.Console({ stdout: process.stderr, stderr: process.stderr });
+console.log = (...args) => stderrConsole.log(...args);
+console.info = (...args) => stderrConsole.info(...args);
+console.warn = (...args) => stderrConsole.warn(...args);
+console.debug = (...args) => stderrConsole.debug(...args);
+
 const require = createRequire(import.meta.url);
 const { existsSync } = require("node:fs");
 const packageJson = require("../package.json");
