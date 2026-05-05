@@ -8,8 +8,13 @@ import { access, mkdir, readFile, rename, stat, unlink, writeFile } from "node:f
 
 const require = createRequire(import.meta.url);
 const { existsSync } = require("node:fs");
+const packageJson = require("../package.json");
 const { analyzeWatermark, writeDebugOverlay } = require("./detect-gemini-watermark.js");
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+const SERVER_INFO = {
+  name: packageJson.name || "gemini-web-mcp",
+  version: packageJson.version || "0.0.0",
+};
 
 function requireFirst(candidates, label) {
   const failures = [];
@@ -2087,7 +2092,7 @@ const tools = [
 
 async function handle(message) {
   if (message.method === "initialize") {
-    send({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: message.params?.protocolVersion || "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "gemini-web-session", version: "0.1.0" } } });
+    send({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: message.params?.protocolVersion || "2024-11-05", capabilities: { tools: {} }, serverInfo: SERVER_INFO } });
     return;
   }
   if (message.method === "tools/list") {

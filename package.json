@@ -9,7 +9,9 @@
   "scripts": {
     "mcp": "node ./scripts/gemini-web-mcp.mjs",
     "launch:profile": "powershell -ExecutionPolicy Bypass -File ./scripts/launch-gemini-profile.ps1",
-    "check": "node --check ./scripts/gemini-web-mcp.mjs"
+    "check": "node --check ./scripts/gemini-web-mcp.mjs",
+    "test:smoke": "node ./scripts/smoke-stdio.mjs",
+    "test": "npm run check && npm run test:smoke"
   },
   "keywords": [
     "browser-automation",
