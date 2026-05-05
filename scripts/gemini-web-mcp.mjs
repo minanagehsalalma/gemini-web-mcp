@@ -530,11 +530,12 @@ async function analyzeWatermarkFile(filePath, options = {}) {
   };
 }
 
-async function refreshGeminiDirectSurface(page) {
+async function refreshGeminiDirectSurface(page, options = {}) {
+  const timeoutMs = Number.isFinite(Number(options.timeoutMs)) ? Number(options.timeoutMs) : 90000;
   if (page.url().includes("gemini.google.com")) {
-    await page.reload({ waitUntil: "domcontentloaded", timeout: 90000 });
+    await page.reload({ waitUntil: "domcontentloaded", timeout: timeoutMs });
   } else {
-    await page.goto(GEMINI_URL, { waitUntil: "domcontentloaded", timeout: 90000 });
+    await page.goto(GEMINI_URL, { waitUntil: "domcontentloaded", timeout: timeoutMs });
   }
   await page.waitForTimeout(3000);
   return await statusForPage(page).catch(() => null);
@@ -718,7 +719,8 @@ function watchDirectImageTemplate(page) {
   };
 }
 
-async function getGeminiDirectBootstrap(page) {
+async function getGeminiDirectBootstrap(page, options = {}) {
+  const timeoutMs = Number.isFinite(Number(options.timeoutMs)) ? Number(options.timeoutMs) : 90000;
   const browserSignals = await page.evaluate(() => ({
     userAgent: navigator.userAgent,
     language: navigator.language || null,
@@ -752,7 +754,7 @@ async function getGeminiDirectBootstrap(page) {
     headerOrder: ["accept", "accept-language", "referer"],
     orderAsProvided: true,
     responseType: "text",
-    timeout: 90000,
+    timeout: timeoutMs,
   }, "get");
   const html = String(faq.data || "");
   const at = html.split("SNlM0e")[1]?.split('":"')[1]?.split('"')[0] || null;
@@ -781,14 +783,30 @@ async function attemptDirectImageGeneration(page, args, outputPath) {
   }
   const startedAt = Date.now();
   const hardTimeoutMs = Number.isFinite(Number(args.hardTimeoutMs)) ? Number(args.hardTimeoutMs) : 1800000;
+  const deadlineAt = startedAt + hardTimeoutMs;
   const client = await getCycleTlsClient();
   let lastFailure = null;
+  const remainingBudgetMs = () => Math.max(0, deadlineAt - Date.now());
 
   for (let attemptIndex = 1; attemptIndex <= 2; attemptIndex += 1) {
-    if (attemptIndex === 2) {
-      await refreshGeminiDirectSurface(page).catch(() => null);
+    const attemptBudgetMs = remainingBudgetMs();
+    if (attemptBudgetMs <= 0) {
+      return lastFailure || {
+        ok: false,
+        transport: "direct",
+        blocker: "Gemini direct image request exceeded the configured hardTimeoutMs before another retry could begin.",
+        shouldFallback: true,
+        waitedMs: Date.now() - startedAt,
+      };
     }
-    const bootstrap = await getGeminiDirectBootstrap(page);
+    if (attemptIndex === 2) {
+      await refreshGeminiDirectSurface(page, {
+        timeoutMs: Math.max(1000, Math.min(90000, remainingBudgetMs())),
+      }).catch(() => null);
+    }
+    const bootstrap = await getGeminiDirectBootstrap(page, {
+      timeoutMs: Math.max(1000, Math.min(90000, remainingBudgetMs())),
+    });
     if (!bootstrap.at || !bootstrap.bl || !bootstrap.fSid) {
       lastFailure = {
         ok: false,
@@ -819,6 +837,7 @@ async function attemptDirectImageGeneration(page, args, outputPath) {
     })}`;
     const body = buildDirectImagePostData(template, args.prompt, bootstrap.at);
     const requestProfile = buildDirectRequestProfile(template, bootstrap);
+    const requestTimeoutMs = Math.max(1000, remainingBudgetMs());
     const response = await client(url, {
       cookies: bootstrap.cookies,
       userAgent: bootstrap.userAgent,
@@ -827,7 +846,7 @@ async function attemptDirectImageGeneration(page, args, outputPath) {
       orderAsProvided: true,
       body,
       responseType: "stream",
-      timeout: hardTimeoutMs,
+      timeout: requestTimeoutMs,
     }, "post");
 
     if (response.status >= 400) {
@@ -851,7 +870,7 @@ async function attemptDirectImageGeneration(page, args, outputPath) {
 
     const streamed = await readDirectImageStream(response, {
       startedAt,
-      hardTimeoutMs,
+      hardTimeoutMs: requestTimeoutMs,
     });
     const parsed = streamed.parsed;
     if (!parsed.imageUrls.length) {
@@ -1673,6 +1692,9 @@ async function generateOneImageOnPage(page, args, outputPath, itemIndex = 1, cou
       : "";
   const timeoutMs = Number.isFinite(Number(args.timeoutMs)) ? Number(args.timeoutMs) : 1200000;
   const hardTimeoutMs = Number.isFinite(Number(args.hardTimeoutMs)) ? Number(args.hardTimeoutMs) : Math.max(timeoutMs, 1800000);
+  const operationStartedAt = Date.now();
+  const operationDeadlineAt = operationStartedAt + hardTimeoutMs;
+  const remainingOperationBudgetMs = () => Math.max(0, operationDeadlineAt - Date.now());
   const freshChat = typeof args.freshChat === "boolean" ? args.freshChat : true;
   const useImageTool = typeof args.useImageTool === "boolean" ? args.useImageTool : true;
   const transport = asTransport(args.transport);
@@ -1802,8 +1824,8 @@ async function generateOneImageOnPage(page, args, outputPath, itemIndex = 1, cou
       observations.push("Prompt left the composer after submit.");
     }
     result = await waitForGeneratedImage(page, outputPath, baseline, {
-      timeoutMs,
-      hardTimeoutMs,
+      timeoutMs: Math.min(timeoutMs, Math.max(1000, remainingOperationBudgetMs())),
+      hardTimeoutMs: Math.max(1000, remainingOperationBudgetMs()),
       removeGeminiWatermark: args.removeGeminiWatermark === true,
       watermarkOutputPath: args.watermarkOutputPath,
       watermarkTimeoutMs: args.watermarkTimeoutMs,
