@@ -1710,19 +1710,21 @@ async function generateOneImageOnPage(page, args, outputPath, itemIndex = 1, cou
   const referenceImagePaths = await ensureReferenceImages(args.referenceImagePaths).catch((error) => {
     throw new Error(`referenceImagePaths validation failed: ${error instanceof Error ? error.message : String(error)}`);
   });
+  const transport = asTransport(args.transport);
   const prompt = typeof args.prompt === "string" && args.prompt.trim()
     ? args.prompt.trim()
     : referenceImagePaths.length
       ? "Create a variation of the attached reference image."
       : "";
   const timeoutMs = Number.isFinite(Number(args.timeoutMs)) ? Number(args.timeoutMs) : 1200000;
-  const hardTimeoutMs = Number.isFinite(Number(args.hardTimeoutMs)) ? Number(args.hardTimeoutMs) : Math.max(timeoutMs, 1800000);
+  const requestedHardTimeoutMs = Number.isFinite(Number(args.hardTimeoutMs)) ? Number(args.hardTimeoutMs) : Math.max(timeoutMs, 1800000);
+  const directReliabilityFloorMs = transport !== "ui" && !referenceImagePaths.length && prompt ? 120000 : 0;
+  const hardTimeoutMs = Math.max(requestedHardTimeoutMs, directReliabilityFloorMs);
   const operationStartedAt = Date.now();
   const operationDeadlineAt = operationStartedAt + hardTimeoutMs;
   const remainingOperationBudgetMs = () => Math.max(0, operationDeadlineAt - Date.now());
   const freshChat = typeof args.freshChat === "boolean" ? args.freshChat : true;
   const useImageTool = typeof args.useImageTool === "boolean" ? args.useImageTool : true;
-  const transport = asTransport(args.transport);
   const observations = [];
   if (!prompt && !referenceImagePaths.length) {
     return {
@@ -1735,6 +1737,9 @@ async function generateOneImageOnPage(page, args, outputPath, itemIndex = 1, cou
     };
   }
   observations.push(`Transport policy: ${transport === "auto" ? "prefer direct CycleTLS first, then fall back to Playwright UI if needed." : transport === "direct" ? "direct CycleTLS only." : "force Playwright UI."}`);
+  if (hardTimeoutMs > requestedHardTimeoutMs) {
+    observations.push(`Raised hardTimeoutMs from ${requestedHardTimeoutMs}ms to ${hardTimeoutMs}ms for a prompt-only direct-capable image flow, because Gemini can delay final image URL emission after accepting the request.`);
+  }
   if (Number.isFinite(Number(args.cooldownWaitMs)) && Number(args.cooldownWaitMs) > 0) {
     observations.push(`Waited ${Number(args.cooldownWaitMs)}ms before starting this item to stagger Gemini requests.`);
   }
