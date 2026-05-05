@@ -208,6 +208,20 @@ function normalizeHeaderName(name) {
   return String(name || "").trim().toLowerCase();
 }
 
+function detectGeminiImageProgress(text) {
+  const body = String(text || "");
+  const checks = [
+    { phase: "creating_image", label: "Creating your image...", pattern: /creating your image/i },
+    { phase: "analyzing_image", label: "Analyzing the image...", pattern: /analyzing (the )?image/i },
+    { phase: "rendering_image", label: "Rendering your image...", pattern: /rendering (your )?image/i },
+    { phase: "working_image", label: "Working on your image...", pattern: /working on (your )?image/i },
+  ];
+  const match = checks.find((item) => item.pattern.test(body));
+  return match
+    ? { active: true, phase: match.phase, label: match.label }
+    : { active: false, phase: null, label: null };
+}
+
 function buildAcceptLanguageHeader(localeInfo) {
   const raw = [];
   for (const item of Array.isArray(localeInfo?.languages) ? localeInfo.languages : []) {
@@ -1009,6 +1023,7 @@ async function statusForPage(page) {
   ].join(",")).count().catch(() => 0);
   const visibleImageCount = (await getImageCandidates(page).catch(() => [])).length;
   const joined = `${url}\n${title}\n${text}`;
+  const imageProgress = detectGeminiImageProgress(joined);
   const status = {
     url,
     title,
@@ -1019,7 +1034,9 @@ async function statusForPage(page) {
     attachedFileCount: attachments.count,
     attachedFiles: attachments.items.slice(0, 5),
     directImageTemplateCached: Boolean(directTemplate?.innerRequest),
-    isCreatingImage: /creating your image/i.test(joined),
+    isCreatingImage: imageProgress.active,
+    imageProgressPhase: imageProgress.phase,
+    imageProgressLabel: imageProgress.label,
     hasStylePicker: /pick a style for your image/i.test(joined),
     hasNetworkError: /site can't be reached|ERR_|took too long to respond/i.test(joined),
     cdpUrl: CDP_URL,
@@ -1048,7 +1065,7 @@ function diagnoseStatus(status) {
     return {
       state: "image_generation_in_progress",
       confidence: "high",
-      summary: "Gemini is actively showing 'Creating your image...'.",
+      summary: `Gemini is actively showing '${status.imageProgressLabel || "an image-generation progress state"}'.`,
       recommendation: "Wait; do not retry, refresh, or submit another prompt until this state clears.",
     };
   }
@@ -1596,6 +1613,7 @@ async function waitForGeneratedImage(page, outputPath, baseline, options = {}) {
 
     const bodyText = await page.locator("body").innerText({ timeout: 10000 }).catch(() => "");
     lastBodyText = bodyText;
+    const imageProgress = detectGeminiImageProgress(bodyText);
     if (/something went wrong\s*\(\d+\)/i.test(bodyText)) {
       return { ok: false, blocker: "Gemini reported an image-generation error.", status: current, waitedMs: Date.now() - start, bodyExcerpt: bodyText.slice(0, 1000) };
     }
@@ -1603,14 +1621,15 @@ async function waitForGeneratedImage(page, outputPath, baseline, options = {}) {
       return { ok: false, blocker: "Gemini opened the image style picker instead of submitting the prompt. Retry with useImageTool=false.", status: current, waitedMs: Date.now() - start, bodyExcerpt: bodyText.slice(0, 1000) };
     }
 
-    if (!/creating your image/i.test(bodyText) && Date.now() - start >= timeoutMs) {
+    if (!imageProgress.active && Date.now() - start >= timeoutMs) {
       break;
     }
   }
 
   const bodyText = lastBodyText || await page.locator("body").innerText({ timeout: 10000 }).catch(() => "");
-  const blocker = /creating your image/i.test(bodyText)
-    ? "Gemini was still creating the image when the hard timeout expired."
+  const imageProgress = detectGeminiImageProgress(bodyText);
+  const blocker = imageProgress.active
+    ? `Gemini was still in '${imageProgress.label}' when the hard timeout expired.`
     : "No image element found before timeout.";
   return { ok: false, blocker, status: await statusForPage(page), waitedMs: Date.now() - start, bodyExcerpt: bodyText.slice(0, 1000) };
 }
