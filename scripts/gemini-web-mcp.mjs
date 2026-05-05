@@ -213,6 +213,7 @@ function detectGeminiImageProgress(text) {
   const checks = [
     { phase: "creating_image", label: "Creating your image...", pattern: /creating your image/i },
     { phase: "analyzing_image", label: "Analyzing the image...", pattern: /analyzing (the )?image/i },
+    { phase: "verifying_aesthetic_adherence", label: "Verifying Aesthetic Adherence...", pattern: /verifying aesthetic adherence/i },
     { phase: "rendering_image", label: "Rendering your image...", pattern: /rendering (your )?image/i },
     { phase: "working_image", label: "Working on your image...", pattern: /working on (your )?image/i },
   ];
@@ -1640,6 +1641,12 @@ function asPositiveInt(value, fallback, min = 1, max = 20) {
   return Math.max(min, Math.min(max, number));
 }
 
+function asPositiveMs(value, fallback) {
+  const number = Number.parseInt(value, 10);
+  if (!Number.isFinite(number) || number <= 0) return fallback;
+  return number;
+}
+
 function createStartGate(cooldownMs) {
   let nextAllowedStart = Date.now();
   return async () => {
@@ -1716,12 +1723,20 @@ async function generateOneImageOnPage(page, args, outputPath, itemIndex = 1, cou
     : referenceImagePaths.length
       ? "Create a variation of the attached reference image."
       : "";
-  const timeoutMs = Number.isFinite(Number(args.timeoutMs)) ? Number(args.timeoutMs) : 1200000;
-  const requestedHardTimeoutMs = Number.isFinite(Number(args.hardTimeoutMs)) ? Number(args.hardTimeoutMs) : Math.max(timeoutMs, 1800000);
+  const timeoutMs = asPositiveMs(args.timeoutMs, 1200000);
+  const legacyHardTimeoutMs = asPositiveMs(args.hardTimeoutMs, Math.max(timeoutMs, 1800000));
+  const explicitTotalTimeoutMs = asPositiveMs(args.totalTimeoutMs, null);
+  const totalTimeoutMs = explicitTotalTimeoutMs || legacyHardTimeoutMs;
   const directReliabilityFloorMs = transport !== "ui" && !referenceImagePaths.length && prompt ? 120000 : 0;
-  const hardTimeoutMs = Math.max(requestedHardTimeoutMs, directReliabilityFloorMs);
+  const requestedDirectStageTimeoutMs = asPositiveMs(args.directStageTimeoutMs, null);
+  const requestedUiStageTimeoutMs = asPositiveMs(args.uiStageTimeoutMs, null);
+  const directStageTimeoutMs = Math.min(
+    totalTimeoutMs,
+    requestedDirectStageTimeoutMs || Math.max(Math.min(totalTimeoutMs, legacyHardTimeoutMs), directReliabilityFloorMs),
+  );
+  const uiStageTimeoutMs = Math.min(totalTimeoutMs, requestedUiStageTimeoutMs || totalTimeoutMs);
   const operationStartedAt = Date.now();
-  const operationDeadlineAt = operationStartedAt + hardTimeoutMs;
+  const operationDeadlineAt = operationStartedAt + totalTimeoutMs;
   const remainingOperationBudgetMs = () => Math.max(0, operationDeadlineAt - Date.now());
   const freshChat = typeof args.freshChat === "boolean" ? args.freshChat : true;
   const useImageTool = typeof args.useImageTool === "boolean" ? args.useImageTool : true;
@@ -1737,8 +1752,11 @@ async function generateOneImageOnPage(page, args, outputPath, itemIndex = 1, cou
     };
   }
   observations.push(`Transport policy: ${transport === "auto" ? "prefer direct CycleTLS first, then fall back to Playwright UI if needed." : transport === "direct" ? "direct CycleTLS only." : "force Playwright UI."}`);
-  if (hardTimeoutMs > requestedHardTimeoutMs) {
-    observations.push(`Raised hardTimeoutMs from ${requestedHardTimeoutMs}ms to ${hardTimeoutMs}ms for a prompt-only direct-capable image flow, because Gemini can delay final image URL emission after accepting the request.`);
+  if (directStageTimeoutMs > (requestedDirectStageTimeoutMs || legacyHardTimeoutMs)) {
+    observations.push(`Raised directStageTimeoutMs from ${requestedDirectStageTimeoutMs || legacyHardTimeoutMs}ms to ${directStageTimeoutMs}ms for a prompt-only direct-capable image flow, because Gemini can delay final image URL emission after accepting the request.`);
+  }
+  if (explicitTotalTimeoutMs || requestedDirectStageTimeoutMs || requestedUiStageTimeoutMs) {
+    observations.push(`Stage budgets: total=${totalTimeoutMs}ms, direct=${directStageTimeoutMs}ms, ui=${uiStageTimeoutMs}ms.`);
   }
   if (Number.isFinite(Number(args.cooldownWaitMs)) && Number(args.cooldownWaitMs) > 0) {
     observations.push(`Waited ${Number(args.cooldownWaitMs)}ms before starting this item to stagger Gemini requests.`);
@@ -1772,7 +1790,7 @@ async function generateOneImageOnPage(page, args, outputPath, itemIndex = 1, cou
     const directAttempt = await attemptDirectImageGeneration(page, {
       ...args,
       prompt,
-      hardTimeoutMs,
+      hardTimeoutMs: Math.min(directStageTimeoutMs, Math.max(1000, remainingOperationBudgetMs())),
       watermarkOutputPath: args.watermarkOutputPath,
     }, outputPath).catch((error) => ({
       ok: false,
@@ -1796,7 +1814,9 @@ async function generateOneImageOnPage(page, args, outputPath, itemIndex = 1, cou
           referenceImageCount: 0,
           promptPreview: prompt.slice(0, 180),
           timeoutMs,
-          hardTimeoutMs,
+          totalTimeoutMs,
+          directStageTimeoutMs,
+          uiStageTimeoutMs,
           removeGeminiWatermark: args.removeGeminiWatermark === true,
           waitPolicy: "Send the Gemini image request directly over CycleTLS-Parity and save the first returned downloadable image URL.",
           countPolicy: args.parallelIsolation
@@ -1855,7 +1875,7 @@ async function generateOneImageOnPage(page, args, outputPath, itemIndex = 1, cou
     }
     result = await waitForGeneratedImage(page, outputPath, baseline, {
       timeoutMs: Math.min(timeoutMs, Math.max(1000, remainingOperationBudgetMs())),
-      hardTimeoutMs: Math.max(1000, remainingOperationBudgetMs()),
+      hardTimeoutMs: Math.min(uiStageTimeoutMs, Math.max(1000, remainingOperationBudgetMs())),
       removeGeminiWatermark: args.removeGeminiWatermark === true,
       watermarkOutputPath: args.watermarkOutputPath,
       watermarkTimeoutMs: args.watermarkTimeoutMs,
@@ -1879,7 +1899,9 @@ async function generateOneImageOnPage(page, args, outputPath, itemIndex = 1, cou
       referenceImageCount: referenceImagePaths.length,
       promptPreview: prompt.slice(0, 180),
       timeoutMs,
-      hardTimeoutMs,
+      totalTimeoutMs,
+      directStageTimeoutMs,
+      uiStageTimeoutMs,
       removeGeminiWatermark: args.removeGeminiWatermark === true,
       waitPolicy: "Keep waiting while Gemini says 'Creating your image...'; do not retry in that state.",
       countPolicy: args.parallelIsolation
@@ -2113,7 +2135,7 @@ const tools = [
   {
     name: "generate_image_ui",
     description: "Prefer direct Gemini image requests through CycleTLS-Parity, then fall back to Gemini web UI automation when needed.",
-    inputSchema: { type: "object", properties: { prompt: { type: "string" }, prompts: { type: "array", items: { type: "string" } }, referenceImagePaths: { type: "array", items: { type: "string" } }, referenceImagePathsByItem: { type: "array", items: { type: "array", items: { type: "string" } } }, preserveAttachments: { type: "boolean" }, transport: { type: "string" }, count: { type: "integer" }, concurrency: { type: "integer" }, cooldownMs: { type: "integer" }, continueOnFailure: { type: "boolean" }, outputPath: { type: "string" }, timeoutMs: { type: "integer" }, hardTimeoutMs: { type: "integer" }, freshChat: { type: "boolean" }, useImageTool: { type: "boolean" }, removeGeminiWatermark: { type: "boolean" }, watermarkOutputPath: { type: "string" }, watermarkTimeoutMs: { type: "integer" }, verifyWatermarkRemoval: { type: "boolean" } } },
+    inputSchema: { type: "object", properties: { prompt: { type: "string" }, prompts: { type: "array", items: { type: "string" } }, referenceImagePaths: { type: "array", items: { type: "string" } }, referenceImagePathsByItem: { type: "array", items: { type: "array", items: { type: "string" } } }, preserveAttachments: { type: "boolean" }, transport: { type: "string" }, count: { type: "integer" }, concurrency: { type: "integer" }, cooldownMs: { type: "integer" }, continueOnFailure: { type: "boolean" }, outputPath: { type: "string" }, timeoutMs: { type: "integer" }, hardTimeoutMs: { type: "integer" }, totalTimeoutMs: { type: "integer" }, directStageTimeoutMs: { type: "integer" }, uiStageTimeoutMs: { type: "integer" }, freshChat: { type: "boolean" }, useImageTool: { type: "boolean" }, removeGeminiWatermark: { type: "boolean" }, watermarkOutputPath: { type: "string" }, watermarkTimeoutMs: { type: "integer" }, verifyWatermarkRemoval: { type: "boolean" } } },
   },
   {
     name: "wait_for_image",

@@ -83,7 +83,8 @@ Image-saving tools accept `removeGeminiWatermark: true` to run the bundled `scri
 - For `count > 1`, inspect `plannedOutputPaths`, `outputPaths`, and per-item `results`; one Gemini item can fail while later items succeed if `continueOnFailure=true`.
 - Use `save_visible_images` with `all=true`, `count`, `imageIndex`, or `imageIndices` when the current Gemini page already has several useful candidates and you want explicit control over which files are written.
 - If `check_status` reports `directImageTemplateCached: false`, the first UI fallback generation can refresh the cached direct-request template and browser header snapshot for later `transport=auto` runs.
-- Do not retry or start another chat while Gemini says `Creating your image...`; wait for that state to disappear. `timeoutMs` applies after Gemini is no longer creating, and `hardTimeoutMs` is only a safety cap for indefinitely stuck generations.
+- Do not retry or start another chat while Gemini says `Creating your image...`; wait for that state to disappear. `timeoutMs` applies after Gemini is no longer creating, and `hardTimeoutMs` is only the legacy total safety cap.
+- For finer control, prefer `totalTimeoutMs`, `directStageTimeoutMs`, and `uiStageTimeoutMs` on `generate_image_ui`. A good default is to let `auto` run with a larger direct stage than the visible-UI fallback stage, rather than forcing both phases to share one timeout budget.
 - Use `removeGeminiWatermark: true` only when the user requests a cleaned saved output; if it fails, preserve the error details instead of pretending the image was cleaned.
 - Use `detect_watermark_file` when you need evidence before/after cleanup; compare detector `confidence` and `confidenceDelta` rather than assuming the visual patch succeeded.
 - If image generation fails, keep `pollinations-free-image` as the reliable no-key fallback.
