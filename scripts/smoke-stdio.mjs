@@ -3,11 +3,32 @@ import { spawn } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
+import { classifyGeminiAuthBootstrap } from "./gemini-auth-status.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, "..");
 const serverPath = resolve(scriptDir, "gemini-web-mcp.mjs");
 const packageJson = JSON.parse(await readFile(resolve(repoRoot, "package.json"), "utf8"));
+
+assert.deepEqual(
+  classifyGeminiAuthBootstrap({ httpOk: true, hasAuthUser: false, hasLoginMarker: true }),
+  { state: "login_required", reason: "google_login_page" },
+  "A visible composer must not override a Google login page.",
+);
+assert.deepEqual(
+  classifyGeminiAuthBootstrap({ httpOk: true, hasAuthUser: true, hasSnlM0e: true, hasCfb2h: true }),
+  { state: "authenticated", reason: "session_bootstrap_ready" },
+  "A valid request bootstrap should be recognized without returning its values.",
+);
+assert.deepEqual(
+  classifyGeminiAuthBootstrap({ httpOk: true, hasAuthUser: true, hasSnlM0e: false, hasCfb2h: false }),
+  { state: "unavailable", reason: "session_tokens_missing" },
+  "Partial bootstrap data must not be reported as signed in.",
+);
+assert.deepEqual(
+  classifyGeminiAuthBootstrap({ httpOk: false }),
+  { state: "unavailable", reason: "bootstrap_fetch_failed" },
+);
 
 function parseJsonLines(text) {
   return text

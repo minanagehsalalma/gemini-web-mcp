@@ -5,6 +5,7 @@ import net from "node:net";
 import { dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { access, mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { classifyGeminiAuthBootstrap } from "./gemini-auth-status.mjs";
 
 const stderrConsole = new console.Console({ stdout: process.stderr, stderr: process.stderr });
 console.log = (...args) => stderrConsole.log(...args);
@@ -78,6 +79,7 @@ let buffer = "";
 let cycleTlsClientPromise = null;
 let directImageTemplateMemory = undefined;
 const pendingMessageTasks = new Set();
+const authStatusCache = new WeakMap();
 
 function send(payload) {
   process.stdout.write(`${JSON.stringify(payload)}\n`);
@@ -1023,12 +1025,16 @@ async function statusForPage(page) {
     "textarea",
   ].join(",")).count().catch(() => 0);
   const visibleImageCount = (await getImageCandidates(page).catch(() => [])).length;
+  const auth = await getGeminiAuthStatus(page);
   const joined = `${url}\n${title}\n${text}`;
+  const pageShowsLogin = /accounts\.google\.com|serviceLogin|sign in|signin|choose an account/i.test(joined);
+  const authState = auth.state === "unavailable" && pageShowsLogin ? "login_required" : auth.state;
   const imageProgress = detectGeminiImageProgress(joined);
   const status = {
     url,
     title,
-    needsLogin: /sign in|signin|serviceLogin|login|choose an account/i.test(joined),
+    needsLogin: authState === "login_required",
+    authState,
     hasPromptSurface: (promptInputCount > 0 || /enter a prompt|ask gemini|message gemini|conversation with gemini|new chat|chat with gemini|prompt/i.test(joined)) && !/site can't be reached|ERR_/i.test(joined),
     promptInputCount,
     visibleImageCount,
@@ -1043,6 +1049,33 @@ async function statusForPage(page) {
     cdpUrl: CDP_URL,
   };
   return { ...status, diagnosis: diagnoseStatus(status) };
+}
+
+async function getGeminiAuthStatus(page) {
+  const cached = authStatusCache.get(page);
+  if (cached && cached.expiresAt > Date.now()) return cached.status;
+  const signals = await page.evaluate(async () => {
+    try {
+      const response = await fetch("/faq", { credentials: "include" });
+      const html = response.ok ? await response.text() : "";
+      return {
+        httpOk: response.ok,
+        httpStatus: response.status,
+        hasAuthUser: html.includes("$authuser"),
+        hasLoginMarker: /accounts\.google\.com|serviceLogin|sign in|signin|choose an account/i.test(html),
+        hasSnlM0e: /"SNlM0e"\s*:\s*"[^"]+"/.test(html),
+        hasCfb2h: /"cfb2h"\s*:\s*"[^"]+"/.test(html),
+      };
+    } catch {
+      return { httpOk: false };
+    }
+  }).catch(() => ({ httpOk: false }));
+  const status = classifyGeminiAuthBootstrap(signals);
+  if (signals.httpOk === false && Number.isInteger(signals.httpStatus)) {
+    status.reason = `bootstrap_http_${signals.httpStatus}`;
+  }
+  authStatusCache.set(page, { status, expiresAt: Date.now() + 5000 });
+  return status;
 }
 
 function diagnoseStatus(status) {
@@ -1060,6 +1093,14 @@ function diagnoseStatus(status) {
       confidence: "high",
       summary: "The dedicated Chrome profile is not ready for automation because Google login or consent is visible.",
       recommendation: "Handle login/consent manually in the visible Chrome profile. Do not import cookies.",
+    };
+  }
+  if (status.authState === "unavailable") {
+    return {
+      state: "auth_check_unavailable",
+      confidence: "medium",
+      summary: "Gemini's prompt surface is visible, but its signed-in session could not be verified for requests.",
+      recommendation: "Open the dedicated Gemini Chrome profile. If Google asks you to sign in, complete it manually; otherwise check the profile's network access and retry. No prompt was sent.",
     };
   }
   if (status.isCreatingImage) {
@@ -1098,7 +1139,7 @@ function diagnoseStatus(status) {
     return {
       state: "ready_for_prompt",
       confidence: "high",
-      summary: "Gemini is signed in and the prompt composer is available.",
+      summary: "Gemini's request bootstrap is available and the prompt composer is ready.",
       recommendation: "Use ask_gemini for text or generate_image_ui for image generation.",
     };
   }
@@ -1296,7 +1337,9 @@ async function ensureEngine(page) {
     await page.waitForTimeout(2500);
   }
   const status = await statusForPage(page);
-  if (status.needsLogin || status.hasNetworkError) return { ready: false, status };
+  if (status.needsLogin || status.hasNetworkError || status.authState !== "authenticated") {
+    return { ready: false, status };
+  }
   await page.evaluate(() => {
     delete window.__geminiWebMcpBridge;
   }).catch(() => {});
@@ -1309,9 +1352,23 @@ async function askGemini(args = {}) {
   if (!args.message || typeof args.message !== "string") throw new Error("message is required");
   return await withPage(async (page) => {
     const engine = await ensureEngine(page);
-    if (!engine.ready) return { ok: false, blocker: "Gemini web engine is not ready. Sign in manually in the visible browser, then retry.", status: engine.status };
-    const response = await page.evaluate(async (message) => window.__geminiWebMcpBridge.ask(message), args.message);
-    return { ok: true, response };
+    if (!engine.ready) return { ok: false, blocker: engine.status.diagnosis.recommendation, status: engine.status };
+    try {
+      const response = await page.evaluate(async (message) => window.__geminiWebMcpBridge.ask(message), args.message);
+      return { ok: true, response };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/Not logged into Gemini\/Google|Could not extract Gemini web tokens/.test(message)) {
+        authStatusCache.delete(page);
+        const status = await statusForPage(page);
+        return {
+          ok: false,
+          blocker: status.diagnosis.recommendation,
+          status,
+        };
+      }
+      throw error;
+    }
   });
 }
 
